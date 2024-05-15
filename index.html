@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kalendář hlídání dětí</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f7f7f7;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            max-width: 800px;
+            margin: auto;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .calendar-header button {
+            background-color: #ddd;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+        }
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+        }
+        .calendar .day, .calendar .header {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+            background-color: #f2f2f2;
+            border-radius: 4px;
+            position: relative;
+            cursor: pointer;
+        }
+        .calendar .header {
+            background-color: #ddd;
+            font-weight: bold;
+        }
+        .today {
+            border: 2px solid #000;
+        }
+        .weekend {
+            background-color: #e6f7ff;
+        }
+        .babicka1 {
+            background-color: #FFDDC1;
+        }
+        .babicka2 {
+            background-color: #C1E1FF;
+        }
+        .babicka3 {
+            background-color: #C1FFD7;
+        }
+        .overnight {
+            display: block;
+            font-size: 12px;
+            color: #555;
+        }
+        .add-entry {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+        }
+        .add-entry input, .add-entry select, .add-entry button {
+            margin: 5px 0;
+            padding: 10px;
+            width: 100%;
+            max-width: 300px;
+            font-size: 16px;
+        }
+        .add-entry .time-inputs {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 300px;
+        }
+        .add-entry .time-inputs input {
+            width: 48%;
+        }
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Kalendář hlídání dětí</h1>
+        <div class="calendar-header">
+            <button onclick="prevMonth()">‹</button>
+            <div id="month-year"></div>
+            <button onclick="nextMonth()">›</button>
+        </div>
+        <div class="calendar" id="calendar">
+            <div class="header">Pondělí</div>
+            <div class="header">Úterý</div>
+            <div class="header">Středa</div>
+            <div class="header">Čtvrtek</div>
+            <div class="header">Pátek</div>
+            <div class="header">Sobota</div>
+            <div class="header">Neděle</div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-overlay" onclick="closeModal()"></div>
+
+    <div class="add-entry" id="add-entry">
+        <h2>Přidat záznam</h2>
+        <input type="date" id="date-input" readonly>
+        <select id="babicka-select" required>
+            <option value="" disabled selected>Vyberte babičku</option>
+            <option value="babicka1">Babička 1</option>
+            <option value="babicka2">Babička 2</option>
+            <option value="babicka3">Babička 3</option>
+        </select>
+        <div class="time-inputs">
+            <input type="time" id="start-time" required>
+            <input type="time" id="end-time" required>
+        </div>
+        <label>
+            <input type="checkbox" id="overnight-checkbox"> Přespání přes noc
+        </label>
+        <button onclick="addEntry()">Přidat záznam</button>
+        <button onclick="closeModal()">Zavřít</button>
+    </div>
+
+    <script>
+        let currentMonth = new Date().getMonth();
+        let currentYear = new Date().getFullYear();
+        const today = new Date().toISOString().split('T')[0];
+
+        function generateCalendar(month, year) {
+            const calendar = document.getElementById('calendar');
+            const monthYear = document.getElementById('month-year');
+            monthYear.textContent = new Date(year, month).toLocaleString('cs-CZ', { month: 'long', year: 'numeric' });
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const lastDate = new Date(year, month + 1, 0).getDate();
+
+            // Reset the calendar
+            while (calendar.children.length > 7) {
+                calendar.removeChild(calendar.lastChild);
+            }
+
+            // Fill the calendar with days
+            let dayCount = 1;
+            for (let i = 0; i < 42; i++) {
+                const day = document.createElement('div');
+                day.classList.add('day');
+                if (i >= (firstDay === 0 ? 6 : firstDay - 1) && dayCount <= lastDate) {
+                    const date = new Date(year, month, dayCount).toISOString().split('T')[0];
+                    day.dataset.date = date;
+                    day.textContent = dayCount;
+                    day.addEventListener('click', () => openModal(date));
+                    if (date === today) {
+                        day.classList.add('today');
+                    }
+                    if (i % 7 === 5 || i % 7 === 6) {
+                        day.classList.add('weekend');
+                    }
+                    dayCount++;
+                }
+                calendar.appendChild(day);
+            }
+
+            loadEntries();
+        }
+
+        function openModal(date) {
+            const modal = document.getElementById('add-entry');
+            const overlay = document.getElementById('modal-overlay');
+            document.getElementById('date-input').value = date;
+            modal.style.display = 'flex';
+            overlay.style.display = 'block';
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('add-entry');
+            const overlay = document.getElementById('modal-overlay');
+            modal.style.display = 'none';
+            overlay.style.display = 'none';
+        }
+
+        function addEntry() {
+            const dateInput = document.getElementById('date-input');
+            const babickaSelect = document.getElementById('babicka-select');
+            const startTime = document.getElementById('start-time');
+            const endTime = document.getElementById('end-time');
+            const overnightCheckbox = document.getElementById('overnight-checkbox');
+
+            const dateValue = dateInput.value;
+            const babickaValue = babickaSelect.value;
+            const startTimeValue = startTime.value;
+            const endTimeValue = endTime.value;
+            const isOvernight = overnightCheckbox.checked;
+
+            if (!dateValue || !babickaValue || !startTimeValue || !endTimeValue) {
+                alert('Prosím vyplňte všechna pole.');
+                return;
+            }
+
+            let entries = JSON.parse(localStorage.getItem('entries')) || [];
+            entries.push({
+                date: dateValue,
+                babicka: babickaValue,
+                startTime: startTimeValue,
+                endTime: endTimeValue,
+                overnight: isOvernight
+            });
+            localStorage.setItem('entries', JSON.stringify(entries));
+
+            loadEntries();
+            closeModal();
+        }
+
+        function loadEntries() {
+            const entries = JSON.parse(localStorage.getItem('entries')) || [];
+            const calendarDays = document.querySelectorAll('.calendar .day');
+            calendarDays.forEach(day => {
+                const date = day.dataset.date;
+                day.innerHTML = day.textContent; // Reset to only the day number
+                entries.forEach(entry => {
+                    if (date === entry.date) {
+                        const entryDiv = document.createElement('div');
+                        entryDiv.classList.add('entry', entry.babicka);
+                        entryDiv.innerHTML = `
+                            ${document.querySelector(`#babicka-select option[value=${entry.babicka}]`).textContent}
+                            ${entry.startTime} - ${entry.endTime}
+                            ${entry.overnight ? '<span class="overnight">🛏️ Přespání</span>' : ''}
+                        `;
+                        day.appendChild(entryDiv);
+                    }
+                });
+            });
+        }
+
+        function prevMonth() {
+            currentMonth = (currentMonth === 0) ? 11 : currentMonth - 1;
+            currentYear = (currentMonth === 11) ? currentYear - 1 : currentYear;
+            generateCalendar(currentMonth, currentYear);
+        }
+
+        function nextMonth() {
+            currentMonth = (currentMonth === 11) ? 0 : currentMonth + 1;
+            currentYear = (currentMonth === 0) ? currentYear + 1 : currentYear;
+            generateCalendar(currentMonth, currentYear);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => generateCalendar(currentMonth, currentYear));
+    </script>
+</body>
+</html>
